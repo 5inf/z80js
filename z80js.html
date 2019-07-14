@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>A Javascript Based Z80 Disassembler and Simulator
+</title>
+<style>
+.box {
+  float: left;
+  width: 50%;
+  padding: 0px;
+}
+.clearfix::after {
+  clear: both;
+  display: table;
+}
+</style>
+</head>
+<body>
+
+<div class="clearfix">
+<div class="box" style="background-color:#ddd">
+<p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (I08HEX or S-Record Format)</p>
+<textarea  name="iHex" id="iHex" rows="4" style="margin-left:5%;margin-right:5%;width:90%">
+:100000003E0FD302D30318287036737A7D74360FEF
+:100010006D682D2A632C606E4C74C1549A70191946
+:100020005927ED78A358494A111674D277505110C8
+:100030001100020E0179D3012108007EADD3000624
+:100040008010FE23AF79174FD30130EF1BAFBB20D9
+:10005000E2BA20DF1100020E0179D3012110007EE7
+:10006000ADD300068010FE23AF79174FD30130EFD8
+:100070001BAFBB20E2BA20DF1100020E0179D301D1
+:100080002118007EADD300068010FE23AF79174FF4
+:10009000D30130EF1BAFBB20E2BA20DF1100020E0C
+:1000A0000179D3012120007EADD300068010FE230C
+:1000B000AF79174FD30130EF1BAFBB20E2BA20DF7F
+:1000C0001100020E0179D3012128007EADD3000674
+:1000D0008010FE23AF79174FD30130EF1BAFBB2049
+:1000E000E2BA20DF110002189200000000000000B8
+:10010000783F79717179380000000000000000002C
+:100110007D793F39773976790000000000000000D2
+:10012000546DDB4F865B6D3F000000000000000057
+:100130007906CF5BE66D7D6D0000000000000000D9
+:08014000393F5EF93F7F066DB7
+:00000001FF
+</textarea><br/>
+<button style="margin-left:5%;margin-right:5%;">Convert IHex to Binary</button><button style="margin-left:5%;margin-right:5%;">Convert S-Record to Binary</button>
+</div>
+
+<div class="box" style="background-color:#eee">
+<p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (Hex-Binary)</p>
+<textarea  name="binary" id="binary" rows="4" style="margin-left:5%;margin-right:5%;width:90%">
+3E0FD302D30318287036737A7D74360F
+6D682D2A632C606E4C74C1549A701919
+5927ED78A358494A111674D277505110 
+1100020E0179D3012108007EADD30006 
+8010FE23AF79174FD30130EF1BAFBB20 
+E2BA20DF1100020E0179D3012110007E
+ADD300068010FE23AF79174FD30130EF 
+1BAFBB20E2BA20DF1100020E0179D301 
+2118007EADD300068010FE23AF79174F 
+D30130EF1BAFBB20E2BA20DF1100020E 
+0179D3012120007EADD300068010FE23 
+AF79174FD30130EF1BAFBB20E2BA20DF 
+1100020E0179D3012128007EADD30006 
+8010FE23AF79174FD30130EF1BAFBB20 
+E2BA20DF110002189200000000000000 
+783F7971717938000000000000000000 
+7D793F39773976790000000000000000 
+546DDB4F865B6D3F0000000000000000 
+7906CF5BE66D7D6D0000000000000000 
+393F5EF93F7F066D
+</textarea><br/>
+<button style="margin-left:5%;margin-right:5%;" onclick="javascript:run('DISASSEMBLE')">Disassemble</button>
+</div>
+</div>
+
+<div>
+<hr style="border:solid #ff0000 1px;height:1px;margin-top"/>
+<p>Z80 Archictecture and Register</p>
+<!--<div style="width:100%;height:*;position:relative;background-Image:url(Z80_arch.svg);background-size:100%;background-repeat:no-repeat;">-->
+<div style="width:100%;height:*;max-width:250mm;position:relative;background-color:#dbf1ff">
+<img src="Z80_arch.svg" style="width:100%;opacity: 0.7;">
+<div style="position:absolute;left:35.6%;top:25%">
+<label for="Wdash"> W'<input type=text name="Wdash" id="Wdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label></div>
+<div style="position:absolute;left:43%;top:25%">
+<label for="Zdash">Z'<input type=text name="Zdash" id="Zdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/></label> </div>
+<div style="position:absolute;left:36%;top:30%">
+<label for="Bdash">B'<input type=text name="Bdash" id="Bdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:43%;top:30%">
+<label for="Cdash">C'<input type=text name="Cdash" id="Cdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label></div>
+<div style="position:absolute;left:36%;top:36%">
+<label for="Ddash">D'<input type=text name="Ddash" id="Ddash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:43%;top:36%">
+<label for="Edash">E'<input type=text name="Edash" id="Edash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:36%;top:42%">
+<label for="Hdash">H'<input type=text name="Hdash" id="Hdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:43%;top:42%">
+<label for="Ldash">L'<input type=text name="Ldash" id="Ldash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+
+<div style="position:absolute;left:50.9%;top:25%">
+<label for="W">W <input type=text name="W" id="W" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:58%;top:25%">
+<label for="Z" >Z <input type=text name="Z" id="Z" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:51%;top:30%">
+<label for="B" >B <input type=text name="B" id="B" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:58%;top:30%">
+<label for="C">C <input type=text name="C" id="C" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:51%;top:36%">
+<label for="D" >D <input type=text name="D" id="D" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:58%;top:36%">
+<label for="E" >E <input type=text name="E" id="E" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:51%;top:42%">
+<label for="H" >H <input type=text name="H" id="H" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:58%;top:42%">
+<label for="L" >L <input type=text name="L" id="L" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+
+<div style="position:absolute;left:46%;top:47%">
+<label for="IX" >IX <input type=text name="IX" id="IX" value="0x0000" style="width:4em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:46%;top:52%">
+<label for="IY" >IY <input type=text name="IY" id="IY" value="0x0000" style="width:4em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:46%;top:57%">
+<label for="SP" >SP <input type=text name="SP" id="SP" value="0x0000" style="width:4em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:46%;top:62%">
+<label for="PC" >PC <input type=text name="PC" id="PC" value="0x0000" style="width:4em;background-color:#f4d7d7"/> </label> </div>
+
+<div style="position:absolute;left:76.2%;top:32%">
+<label for="Adash" >A'<input type=text name="Adash" id="Adash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:76.2%;top:26%">
+<label for="A" >A <input type=text name="A" id="A" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:86%;top:32%">
+<label for="Fdash" >F'<input type=text name="Fdash" id="Fdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+<div style="position:absolute;left:86%;top:26%">
+<label for="F" >F <input type=text name="F" id="F" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
+
+</div>
+<p style="text-align:right;color:#aaa"> Image credit: Appaloosa, 17 October 2007, https://commons.wikimedia.org/wiki/File:Z80_arch.svg</p>
+</div>
+
+<hr style="border:solid #ff0000 1px;height:1px;margin-top"/>
+
+<p>Z80 Disassembler and Simulator</p>
+
+<div class="clearfix">
+<button>Reset</button>
+<button onclick="javascript:run('EXCECUTE')">Run</button>
+<button>Step 1</button>
+<button>Step N</button>
+<label for="N">N <input type=text name="N" id="N" value="2" style="width:4em;background-color:#f4d7d7"/> 
+<label for="autoStep">Auto Step
+<input type="checkbox" name="autoStep" id="autoStep"></label>
+<label for="Hz">Hz <input type=text name="Hz" id="Hz" value="1" style="width:2em;background-color:#f4d7d7"/> 
+<button>Run to address</button>
+<label for="Bkpt1">Addr <input type=text name="Addr" id="Addr" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
+<label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
+<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
+</div>
+
+<p>Output</p>
+
+<div class="clearfix">
+<div class="box" style="background-color:#ddd">
+<p style="margin-left:5%;margin-right:5%;width:90%">Disassembly</p>
+<textarea  name="disassembly" id="disassembly" rows="100" style="margin-left:5%;margin-right:5%;width:90%">
+</textarea><br/>
+</div>
+<div class="box" style="background-color:#eee">
+<p style="margin-left:5%;margin-right:5%;width:90%">Exceution Log</p>
+<textarea  name="disassembly" id="excection" rows="100" style="margin-left:5%;margin-right:5%;width:90%">
+</textarea><br/>
+</div>
+</div>
+<script language="javascript">
+console.log("Z80 Disassembler and Simulator started");
+
+
+function run(excectionType){
+var binary=document.getElementById("binary").value;
+binary = binary.toUpperCase();
+binary = binary.replace(/[^A-Z0-9]/gi,"");
+console.log("Ascii Encoded length: "+binary.length);
+var binaryBytes = new Uint8Array(binary.length/2);
+console.log("Binary length: "+binaryBytes.length);
+
+var disassembly="";
+var excection="";
+
+//registers
+var a=0;
+var adash=0;
+var f=0;
+var fdash=0;
+var w=0;
+var wdash=0;
+var z=0;
+var zdash=0;
+var b=0;
+var bdash=0;
+var c=0;
+var cdash=0;
+var d=0;
+var ddash=0;
+var e=0;
+var edash=0;
+var h=0;
+var hdash=0;
+var l=0;
+var ldash=0;
+var ix=0
+var iy=0;
+var sp=0;
+var pc=0;
+
+var inOut = new Array(256); //registers reachable by the in and out instructions
+
+var state="DISASSEMBLE";
+state=excectionType;
+var maxSteps=10000;
+
+for(var i=0;i<binary.length/2;i++){
+  //disassembly+=binary[2*i]+""+binary[2*i+1]+"\n";
+  binaryBytes[i]=parseInt("0x"+binary[2*i]+""+binary[2*i+1]);
+  //console.log(binaryBytes[i]);
+}
+var continueExecute=true;
+var stepCounter = 0;
+
+while(continueExecute) {
+  stepCounter++;
+  var mnemonic="";
+  var currentOpcode=binaryBytes[pc];
+  if(currentOpcode==undefined){
+  currentOpcode=0x00;
+  }
+  //console.log(pc.toString(16)+" "+currentOpcode.toString(16));
+  
+  switch(currentOpcode){
+    case 0x00: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"nop");
+		pc+=1;
+	  }
+	  break;
+	case 0x02: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (bc),a");
+		pc+=1;
+	  }
+	  break;
+	case 0x06: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld b,0x"+binaryBytes[pc+1].toString(16));
+		b=binaryBytes[pc+1];
+		pc+=2;
+	  }
+	  break;  
+    case 0x0e: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld c,0x"+binaryBytes[pc+1].toString(16));
+		c=binaryBytes[pc+1];
+		pc+=2;
+	  }
+	  break;
+    case 0x10: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"djnz 0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+		//console.log(".");
+		//TODO: DJ jump number is wrong! Needs to be interpreted as signed!
+		if(state=="DISASSEMBLE"){
+			pc+=2;
+	    }else{
+			if(b!=0){
+				pc+=2+(binaryBytes[pc+1]<<24 >>24);
+				b--;
+			}else {
+				pc+=2;
+			}
+			
+		}
+	  }
+	  break;
+    case 0x11: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld de,0x"+(binaryBytes[pc+2]*256+binaryBytes[pc+1]).toString(16));
+		d=binaryBytes[pc+2];
+		e=binaryBytes[pc+1];
+		pc+=3;
+	  }
+	  break;
+    case 0x17: {
+	    mnemonic=("m"+pc.toString(16)+"\t"+"rla");
+		console.warn("accumulator not implemented");
+		pc+=1;
+	  }
+	  break;
+    case 0x18: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"jr 0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+		//console.log(".");
+		if(state=="DISASSEMBLE"){
+			pc+=2;
+	    }else{
+			pc+=2+(binaryBytes[pc+1]<<24 >>24);
+		}
+	  }
+	  break;
+	case 0x19: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"add hl,de");
+		pc+=1;
+	  }
+	  break;
+	case 0x1b: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"dec de");
+		pc+=1;
+	  }
+	  break;
+	case 0x20: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"jr nz,0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+		//console.log(".");
+		if(state=="DISASSEMBLE"){
+			pc+=2;
+	    }else{
+			pc+=2+(binaryBytes[pc+1]<<24 >>24);
+		}
+	  }
+	  break;
+	case 0x21: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld hl,0x"+(binaryBytes[pc+2]*256+binaryBytes[pc+1]).toString(16));
+		h=binaryBytes[pc+2];
+		l=binaryBytes[pc+1];
+		pc+=3;
+	  }
+	  break;
+	case 0x23: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"inc hl");
+		if(l>=255){
+			l=0;
+			h++;
+		}else{
+			l++;
+		}
+		pc+=1;
+	  }
+	  break;
+	case 0x27: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"daa");
+		pc+=1;
+	  }
+	  break;
+	case 0x2a: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),0x"+binaryBytes[pc+2].toString(16)+""+binaryBytes[pc+1].toString(16));
+		pc+=3;
+	  }
+	  break;
+	case 0x2d: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"dec l");
+		pc+=1;
+	  }
+	  break;
+    case 0x30: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"jr nc,0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+		//console.log(".");
+		if(state=="DISASSEMBLE"){
+			pc+=2;
+	    }else{
+			pc+=2+(binaryBytes[pc+1]<<24 >>24);
+		};
+	  }
+	  break;
+	case 0x36: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),0x"+binaryBytes[pc+1].toString(16));
+		pc+=2;
+	  }
+	  break;
+	case 0x38: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"jr c,0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+		//console.log(".");
+		if(state=="DISASSEMBLE"){
+			pc+=2;
+	    }else{
+			pc+=2+(binaryBytes[pc+1]<<24 >>24);
+		};
+	  }
+	  break;
+	case 0x39: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"add hl,sp");
+		pc+=1;
+	  }
+	  break;
+	case 0x3E: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld a,0x"+binaryBytes[pc+1].toString(16));
+		a=binaryBytes[pc+1];
+		pc+=2;
+	  }
+	  break;
+	case 0x3f: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ccf");
+		pc+=1;
+	  }
+	  break;
+    case 0x49: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld c,c");
+		pc+=1;
+	  }
+	  break;
+	case 0x4a: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld c,d");
+		pc+=1;
+	  }
+	  break;
+	case 0x4c: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld c,h");
+		pc+=1;
+	  }
+	  break;
+    case 0x4f: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld c,a");
+		c=a;
+		pc+=1;
+	  }
+	  break;
+    case 0x51: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld d,c");
+		pc+=1;
+	  }
+	  break;
+	case 0x54: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld d,h");
+		pc+=1;
+	  }
+	  break;
+    case 0x58: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,b");
+		pc+=1;
+	  }
+	  break;
+	case 0x59: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,c");
+		pc+=1;
+	  }
+	  break;
+	case 0x5b: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,e");
+		pc+=1;
+	  }
+	  break;
+	case 0x5e: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,(hl)");
+		pc+=1;
+	  }
+	  break;
+	case 0x60: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld h,b");
+		pc+=1;
+	  }
+	  break;
+	case 0x68: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld l,b");
+		pc+=1;
+	  }
+	  break;
+	case 0x6d: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld l,l");
+		pc+=1;
+	  }
+	  break;
+	case 0x6e: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld l,(hl)");
+		pc+=1;
+	  }
+	  break;
+    case 0x70: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),b");
+		pc+=1;
+	  }
+	  break;
+	case 0x71: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),c");
+		pc+=1;
+	  }
+	  break;
+	case 0x74: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),h");
+		pc+=1;
+	  }
+	  break;
+	case 0x76: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"halt");
+		pc+=1;
+	  }
+	  break;
+	case 0x77: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),a");
+		pc+=1;
+	  }
+	  break;
+	case 0x78: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,b");
+		pc+=1;
+	  }
+	  break;
+	case 0x79: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld a,c");
+		a=c;
+		pc+=1;
+	  }
+	  break;
+	case 0x7a: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,d");
+		pc+=1;
+	  }
+	  break;
+	case 0x7d: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,l");
+		pc+=1;
+	  }
+	  break;
+    case 0x7e: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"ld a,(hl)");
+		a=binaryBytes[binaryBytes[h]*256+binaryBytes[l]];
+		if(a==undefined){a=0;}
+		pc+=1;
+	  }
+	  break;
+    case 0x7f: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,a");
+		pc+=1;
+	  }
+	  break;
+	case 0x86: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"add a,(hl)");
+		pc+=1;
+	  }
+	  break;
+    case 0x9a: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"sbc a,d");
+		pc+=1;
+	  }
+	  break;
+	case 0xa3: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"and e");
+		pc+=1;
+	  }
+	  break;
+    case 0xad: {
+	    mnemonic=("m"+pc.toString(16)+"\t"+"xor l");
+		console.warn("accumulator not implemented");
+		pc+=1;
+	  }
+	  break;
+    case 0xaf: {
+	    mnemonic=("m"+pc.toString(16)+"\t"+"xor a");
+		console.warn("accumulator not implemented");
+		pc+=1;
+	  }
+	  break;
+	case 0xba: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"cp d");
+		pc+=1;
+	  }
+	  break;
+	case 0xbb: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"cp e");
+		pc+=1;
+	  }
+	  break;
+	case 0xC1: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"pop bc");
+		pc+=1;
+	  }
+	  break;
+     case 0xD2: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"jp nc,0x"+(binaryBytes[pc+2]*256+binaryBytes[pc+1]).toString(16));
+		//console.log(".");
+		//TODO: JP jump number is wrong!
+		if(state=="DISASSEMBLE"){
+			pc+=3;
+	    }else{
+			pc+=binaryBytes[pc+2]*256+binaryBytes[pc+1];
+		}
+	  }
+	  break;
+	case 0xD3: {
+	    mnemonic=(" "+pc.toString(16)+"\t"+"out (0x"+binaryBytes[pc+1].toString(16)+"),a");
+		inOut[binaryBytes[pc+1]]=a;
+		pc+=2;
+	  }
+	  break;
+	case 0xDB: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"in a,(0x"+binaryBytes[pc+1].toString(16)+")");
+		pc+=2;
+	  }
+	  break
+	case 0xE6: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"and 0x"+binaryBytes[pc+1].toString(16)+"");
+		pc+=2;
+	  }
+	  break;
+	case 0xED: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"in a,c");
+		pc+=2;
+	  }
+	  break;
+	case 0xF9: {
+	    mnemonic=("x"+pc.toString(16)+"\t"+"ld sp,hl");
+		pc+=1;
+	  }
+	  break;
+	default:{
+		mnemonic=("x"+pc.toString(16)+"\t"+"undefined op code 0x"+binaryBytes[pc].toString(16));
+	    pc++;
+		}
+		break;
+ }
+  //console.log(mnemonic);
+    if(state=="DISASSEMBLE"){
+		disassembly+=mnemonic+"\n";
+		if(pc>=binaryBytes.length){
+			continueExecute=false;
+		}
+		
+	}else{
+	    mnemonic="step "+stepCounter+": "+mnemonic;
+		document.getElementById("excection").value+=mnemonic+"\n";
+		excection+=mnemonic+"\n";
+		if(stepCounter>=maxSteps||currentOpcode==0x76){//0x76=halt
+			continueExecute=false;
+		}
+	}
+	
+	document.getElementById("A").value="0x"+a.toString(16);
+	document.getElementById("Adash").value="0x"+adash.toString(16);
+	document.getElementById("F").value="0x"+f.toString(16);
+	document.getElementById("Fdash").value="0x"+fdash.toString(16);
+	document.getElementById("W").value="0x"+w.toString(16);
+	document.getElementById("Wdash").value="0x"+wdash.toString(16);
+	document.getElementById("Z").value="0x"+z.toString(16);
+	document.getElementById("Zdash").value="0x"+zdash.toString(16);
+	document.getElementById("B").value="0x"+b.toString(16);
+	document.getElementById("Bdash").value="0x"+bdash.toString(16);
+	document.getElementById("C").value="0x"+c.toString(16);
+	document.getElementById("Cdash").value="0x"+cdash.toString(16);
+	document.getElementById("D").value="0x"+d.toString(16);
+	document.getElementById("Ddash").value="0x"+ddash.toString(16);
+	document.getElementById("E").value="0x"+e.toString(16);
+	document.getElementById("Edash").value="0x"+edash.toString(16);
+	document.getElementById("H").value="0x"+h.toString(16);
+	document.getElementById("Hdash").value="0x"+hdash.toString(16);
+	document.getElementById("L").value="0x"+l.toString(16);
+	document.getElementById("Ldash").value="0x"+ldash.toString(16);
+	document.getElementById("IX").value="0x"+ix.toString(16);
+	document.getElementById("IY").value="0x"+iy.toString(16);
+	document.getElementById("SP").value="0x"+sp.toString(16);
+	document.getElementById("PC").value="0x"+pc.toString(16);
+    
+}
+
+//console.log(disassembly);
+document.getElementById("disassembly").value=disassembly;
+document.getElementById("excection").value=excection;
+
+//binaryBytes.push();
+}
+
+
+</script>
+
+</body>
+</html>

@@ -21,27 +21,6 @@
 <div class="box" style="background-color:#ddd">
 <p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (I08HEX or S-Record Format)</p>
 <textarea  name="iHex" id="iHex" rows="4" style="margin-left:5%;margin-right:5%;width:90%">
-:100000003E0FD302D30318287036737A7D74360FEF
-:100010006D682D2A632C606E4C74C1549A70191946
-:100020005927ED78A358494A111674D277505110C8
-:100030001100020E0179D3012108007EADD3000624
-:100040008010FE23AF79174FD30130EF1BAFBB20D9
-:10005000E2BA20DF1100020E0179D3012110007EE7
-:10006000ADD300068010FE23AF79174FD30130EFD8
-:100070001BAFBB20E2BA20DF1100020E0179D301D1
-:100080002118007EADD300068010FE23AF79174FF4
-:10009000D30130EF1BAFBB20E2BA20DF1100020E0C
-:1000A0000179D3012120007EADD300068010FE230C
-:1000B000AF79174FD30130EF1BAFBB20E2BA20DF7F
-:1000C0001100020E0179D3012128007EADD3000674
-:1000D0008010FE23AF79174FD30130EF1BAFBB2049
-:1000E000E2BA20DF110002189200000000000000B8
-:10010000783F79717179380000000000000000002C
-:100110007D793F39773976790000000000000000D2
-:10012000546DDB4F865B6D3F000000000000000057
-:100130007906CF5BE66D7D6D0000000000000000D9
-:08014000393F5EF93F7F066DB7
-:00000001FF
 </textarea><br/>
 <button style="margin-left:5%;margin-right:5%;">Convert IHex to Binary</button><button style="margin-left:5%;margin-right:5%;">Convert S-Record to Binary</button>
 </div>
@@ -75,7 +54,7 @@ E2BA20DF110002189200000000000000
 </div>
 
 <div>
-<hr style="border:solid #ff0000 1px;height:1px;margin-top"/>
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
 <p>Z80 Archictecture and Register</p>
 <!--<div style="width:100%;height:*;position:relative;background-Image:url(Z80_arch.svg);background-size:100%;background-repeat:no-repeat;">-->
 <div style="width:100%;height:*;max-width:250mm;position:relative;background-color:#dbf1ff">
@@ -136,7 +115,7 @@ E2BA20DF110002189200000000000000
 <p style="text-align:right;color:#aaa"> Image credit: Appaloosa, 17 October 2007, https://commons.wikimedia.org/wiki/File:Z80_arch.svg</p>
 </div>
 
-<hr style="border:solid #ff0000 1px;height:1px;margin-top"/>
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
 
 <p>Z80 Disassembler and Simulator</p>
 
@@ -155,6 +134,8 @@ E2BA20DF110002189200000000000000
 <label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
 </div>
 
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
+
 <p>Output</p>
 
 <div class="clearfix">
@@ -169,6 +150,26 @@ E2BA20DF110002189200000000000000
 </textarea><br/>
 </div>
 </div>
+
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
+
+<p>Call Graph</p>
+<button onclick="javascript:drawCallGraph()">Draw Call Graph</button>
+<div style="background-color:#ddd">
+<p style="margin-left:2.5%;margin-right:2.5%;width:90%">SVG Call Graph of Excecution</p>
+<canvas id="CallGraph" width="200" height="100"></canvas>
+</div>
+
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
+
+<p>Address Based Flow Graph</p>
+<button onclick="javascript:drawFlowGraph()">Draw Flow Graph</button>
+<div style="background-color:#ddd">
+<p style="margin-left:2.5%;margin-right:2.5%;width:90%">SVG Flow Graph of Excecution</p>
+<canvas id="FlowGraph" width="200" height="100"></canvas>
+</div>
+
+
 <script language="javascript">
 console.log("Z80 Disassembler and Simulator started");
 
@@ -654,6 +655,21 @@ document.getElementById("excection").value=excection;
 //binaryBytes.push();
 }
 
+function drawCallGraph(){
+var canvas = document.getElementById("CallGraph");
+var canvasContext = canvas.getContext("2d");
+canvasContext.moveTo(0, 0);
+canvasContext.lineTo(200, 100);
+canvasContext.stroke(); 
+}
+
+function drawFlowGraph(){
+var canvas = document.getElementById("FlowGraph");
+var canvasContext = canvas.getContext("2d");
+canvasContext.moveTo(0, 100);
+canvasContext.lineTo(200, 0);
+canvasContext.stroke(); 
+}
 
 </script>
 

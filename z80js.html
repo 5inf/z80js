@@ -49,7 +49,7 @@ E2BA20DF110002189200000000000000
 7906CF5BE66D7D6D0000000000000000 
 393F5EF93F7F066D
 </textarea><br/>
-<button style="margin-left:5%;margin-right:5%;" onclick="javascript:run('DISASSEMBLE')">Disassemble</button>
+<button style="margin-left:5%;margin-right:5%;" onclick="javascript:disassemble()">Disassemble</button>
 </div>
 </div>
 
@@ -112,7 +112,7 @@ E2BA20DF110002189200000000000000
 <label for="F" >F <input type=text name="F" id="F" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
 
 </div>
-<p style="text-align:right;color:#aaa"> Image credit: Appaloosa, 17 October 2007, https://commons.wikimedia.org/wiki/File:Z80_arch.svg</p>
+<p style="text-align:right;color:#aaa;font-size:small;margin-top:0px;margin-bottom:0px"> Image credit: Appaloosa, 17 October 2007, https://commons.wikimedia.org/wiki/File:Z80_arch.svg</p>
 </div>
 
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
@@ -120,33 +120,34 @@ E2BA20DF110002189200000000000000
 <p>Z80 Disassembler and Simulator</p>
 
 <div class="clearfix">
-<button>Reset</button>
-<button onclick="javascript:run('EXCECUTE')">Run</button>
-<button>Step 1</button>
-<button>Step N</button>
-<label for="N">N <input type=text name="N" id="N" value="2" style="width:4em;background-color:#f4d7d7"/> 
-<label for="autoStep">Auto Step
-<input type="checkbox" name="autoStep" id="autoStep"></label>
-<label for="Hz">Hz <input type=text name="Hz" id="Hz" value="1" style="width:2em;background-color:#f4d7d7"/> 
-<button>Run to address</button>
-<label for="Bkpt1">Addr <input type=text name="Addr" id="Addr" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
-<label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
-<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x00" style="width:4em;background-color:#f4d7d7"/> 
+<button onclick="javascript:reset()">Reset</button>
+<button onclick="javascript:run()">Run</button>
+<button onclick="javascript:step()">Step 1</button>
+<button onclick="javascript:stepN()">Step N</button>
+<label for="N">N <input type=text name="N" id="N" value="2" style="width:4em;background-color:#f4d7d7"/> </label>
+<label for="autoStep">Auto Step<input type="checkbox" name="autoStep" id="autoStep" onclick="javascript:autoStep()"/></label>
+<label for="Hz"><input type=text name="Hz" id="Hz" value="1" style="width:2em;background-color:#f4d7d7"/>Hz</label>
+<button onclick="javascript:runToAddr()">Run to addr</button>
+<label for="Bkpt1">Addr <input type=text name="Addr" id="Addr" value="0x03" style="width:4em;background-color:#f4d7d7"/>  </label>
+<label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x00" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt1Enabled" id="Bkpt1Enabled" disabled="disabled" />  </label>
+<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x00" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt2Enabled" id="Bkpt2Enabled" disabled="disabled" />  </label>
 </div>
 
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
 
 <p>Output</p>
-
+<!-- I shall not use spaces to format text -->
 <div class="clearfix">
 <div class="box" style="background-color:#ddd">
 <p style="margin-left:5%;margin-right:5%;width:90%">Disassembly</p>
-<textarea  name="disassembly" id="disassembly" rows="100" style="margin-left:5%;margin-right:5%;width:90%">
+<p style="margin-left:5%;margin-right:5%;width:90%;margin-bottom:0px;">address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd+data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mnemonic</p>
+<textarea  name="disassembly" id="disassembly" rows="50" style="margin-left:5%;margin-right:5%;width:90%">
 </textarea><br/>
 </div>
 <div class="box" style="background-color:#eee">
 <p style="margin-left:5%;margin-right:5%;width:90%">Exceution Log</p>
-<textarea  name="disassembly" id="excection" rows="100" style="margin-left:5%;margin-right:5%;width:90%">
+<p style="margin-left:5%;margin-right:5%;width:90%;margin-bottom:0px;">step&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd+data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mnemonic</p>
+<textarea  name="disassembly" id="excection" rows="50" style="margin-left:5%;margin-right:5%;width:90%">
 </textarea><br/>
 </div>
 </div>
@@ -173,17 +174,14 @@ E2BA20DF110002189200000000000000
 <script language="javascript">
 console.log("Z80 Disassembler and Simulator started");
 
+var binaryBytes;
+var inOut = new Array(256); //registers reachable by the in and out instructions
+var disassembly=""; //holds the output of the disassembly
+var excection=""; //holds the ouput of the excection
+var stepCounter = 0;
+var maxSteps=100;
+var autoStepTimer;
 
-function run(excectionType){
-var binary=document.getElementById("binary").value;
-binary = binary.toUpperCase();
-binary = binary.replace(/[^A-Z0-9]/gi,"");
-console.log("Ascii Encoded length: "+binary.length);
-var binaryBytes = new Uint8Array(binary.length/2);
-console.log("Binary length: "+binaryBytes.length);
-
-var disassembly="";
-var excection="";
 
 //registers
 var a=0;
@@ -211,21 +209,135 @@ var iy=0;
 var sp=0;
 var pc=0;
 
-var inOut = new Array(256); //registers reachable by the in and out instructions
-
-var state="DISASSEMBLE";
-state=excectionType;
-var maxSteps=10000;
-
-for(var i=0;i<binary.length/2;i++){
-  //disassembly+=binary[2*i]+""+binary[2*i+1]+"\n";
-  binaryBytes[i]=parseInt("0x"+binary[2*i]+""+binary[2*i+1]);
-  //console.log(binaryBytes[i]);
+function pad(value, width) {
+  value = value + "";
+  return value.length >= width ? value : new Array(width - value.length + 1).join('0') + value;
 }
-var continueExecute=true;
-var stepCounter = 0;
 
-while(continueExecute) {
+
+function asQwordHex(value){
+return "0x"+pad(value.toString(16),16);
+}
+
+function asDwordHex(value){
+return "0x"+pad(value.toString(16),8);
+}
+
+function asWordHex(value){
+return "0x"+pad(value.toString(16),4);
+}
+
+function asByteHex(value){
+return "0x"+pad(value.toString(16),2);
+}
+
+function run(){
+	if(binaryBytes!=undefined){
+		while(excecute('RUN'));
+	}
+}
+
+function step(){
+	if(binaryBytes!=undefined){
+		excecute('RUN');
+	}
+}
+
+function stepN(){
+	if(binaryBytes!=undefined){
+		var i=1;
+		var j=document.getElementById("N").value;
+		while(excecute('RUN')&&i<j){
+			i++;
+		}
+	}
+}
+
+function autoStep(){
+	if(binaryBytes==undefined){
+		document.getElementById("autoStep").checked=false;
+		return;
+	}
+	if(document.getElementById("autoStep").checked==true){
+		console.log("auto step on");
+		var hz=document.getElementById("Hz").value;
+		autoStepTimer=setInterval(step, 1000/hz);
+	}else{
+		console.log("auto step off");
+		clearTimeout(autoStepTimer);
+	}
+}
+
+function runToAddr(){
+	if(binaryBytes!=undefined){
+		var addr = parseInt(document.getElementById("Addr").value, 16);
+		while(pc!=addr&&excecute('RUN')){
+			//console.log("addr: "+addr+" pc "+pc);			
+		}
+	}
+}
+
+function reset(){
+	document.getElementById("excection").value="";
+	binaryBytes=undefined;
+	inOut = new Array(256);
+	disassembly="";
+	excection="";
+	disassemble();
+	stepCounter = 0;
+	//reset registers
+	a=0;
+	adash=0;
+	f=0;	
+	fdash=0;
+	w=0;
+	wdash=0;
+	z=0;
+	zdash=0;
+	b=0;
+	bdash=0;
+	c=0;
+	cdash=0;
+	d=0;
+	ddash=0;
+	e=0;
+	edash=0;
+	h=0;
+	hdash=0;
+	l=0;
+	ldash=0;
+	ix=0
+	iy=0;
+	sp=0;
+	pc=0;
+}
+
+function disassemble(){
+	var binary=document.getElementById("binary").value;
+	binary = binary.toUpperCase();
+	binary = binary.replace(/[^A-Z0-9]/gi,"");
+	console.log("Ascii Encoded length: "+binary.length);
+	binaryBytes = new Uint8Array(binary.length/2);
+	console.log("Binary length: "+binaryBytes.length);
+	
+	for(var i=0;i<binary.length/2;i++){
+		//disassembly+=binary[2*i]+""+binary[2*i+1]+"\n";
+		binaryBytes[i]=parseInt("0x"+binary[2*i]+""+binary[2*i+1]);
+		//console.log(binaryBytes[i]);
+	}
+	disassembly="";
+	stepCounter = 0;
+	pc=0;
+	while(excecute('DISASSEMBLE'));
+}
+
+function excecute(excectionType){
+
+  var state="DISASSEMBLE";
+  state=excectionType;
+
+  var continueExecute=true;
+
   stepCounter++;
   var mnemonic="";
   var currentOpcode=binaryBytes[pc];
@@ -236,31 +348,30 @@ while(continueExecute) {
   
   switch(currentOpcode){
     case 0x00: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"nop");
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"nop");
 		pc+=1;
 	  }
 	  break;
 	case 0x02: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (bc),a");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld (bc),a");
 		pc+=1;
 	  }
 	  break;
 	case 0x06: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld b,0x"+binaryBytes[pc+1].toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"ld b,"+asByteHex(binaryBytes[pc+1]));
 		b=binaryBytes[pc+1];
 		pc+=2;
 	  }
 	  break;  
     case 0x0e: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld c,0x"+binaryBytes[pc+1].toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"ld c,"+asByteHex(binaryBytes[pc+1]));
 		c=binaryBytes[pc+1];
 		pc+=2;
 	  }
 	  break;
     case 0x10: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"djnz 0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"djnz "+asWordHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
 		//console.log(".");
-		//TODO: DJ jump number is wrong! Needs to be interpreted as signed!
 		if(state=="DISASSEMBLE"){
 			pc+=2;
 	    }else{
@@ -275,20 +386,20 @@ while(continueExecute) {
 	  }
 	  break;
     case 0x11: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld de,0x"+(binaryBytes[pc+2]*256+binaryBytes[pc+1]).toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+" "+asByteHex(binaryBytes[pc+2])+"\t"+"ld de,"+asWordHex(binaryBytes[pc+2]*256+binaryBytes[pc+1]));
 		d=binaryBytes[pc+2];
 		e=binaryBytes[pc+1];
 		pc+=3;
 	  }
 	  break;
     case 0x17: {
-	    mnemonic=("m"+pc.toString(16)+"\t"+"rla");
-		console.warn("accumulator not implemented");
+	    mnemonic=("m"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"rla");
+		console.warn("not implemented");
 		pc+=1;
 	  }
 	  break;
     case 0x18: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"jr 0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr "+asWordHex((binaryBytes[pc+1]<<24 >>24)+pc+2))
 		//console.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
@@ -298,17 +409,17 @@ while(continueExecute) {
 	  }
 	  break;
 	case 0x19: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"add hl,de");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"add hl,de");
 		pc+=1;
 	  }
 	  break;
 	case 0x1b: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"dec de");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"dec de");
 		pc+=1;
 	  }
 	  break;
 	case 0x20: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"jr nz,0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr nz,"+asByteHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
 		//console.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
@@ -318,14 +429,14 @@ while(continueExecute) {
 	  }
 	  break;
 	case 0x21: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld hl,0x"+(binaryBytes[pc+2]*256+binaryBytes[pc+1]).toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+" "+asByteHex(binaryBytes[pc+2])+"\t"+"ld hl,"+asWordHex(binaryBytes[pc+2]*256+binaryBytes[pc+1]));
 		h=binaryBytes[pc+2];
 		l=binaryBytes[pc+1];
 		pc+=3;
 	  }
 	  break;
 	case 0x23: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"inc hl");
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"inc hl");
 		if(l>=255){
 			l=0;
 			h++;
@@ -336,22 +447,22 @@ while(continueExecute) {
 	  }
 	  break;
 	case 0x27: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"daa");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"daa");
 		pc+=1;
 	  }
 	  break;
 	case 0x2a: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),0x"+binaryBytes[pc+2].toString(16)+""+binaryBytes[pc+1].toString(16));
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+" "+asByteHex(binaryBytes[pc+2])+"\t"+"ld (hl),"+asWordHex(binaryBytes[pc+2]*256+binaryBytes[pc+1]));
 		pc+=3;
 	  }
 	  break;
 	case 0x2d: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"dec l");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"dec l");
 		pc+=1;
 	  }
 	  break;
     case 0x30: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"jr nc,0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr nc,"+asByteHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
 		//console.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
@@ -361,12 +472,12 @@ while(continueExecute) {
 	  }
 	  break;
 	case 0x36: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),0x"+binaryBytes[pc+1].toString(16));
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"ld (hl),"+asByteHex(binaryBytes[pc+1]));
 		pc+=2;
 	  }
 	  break;
 	case 0x38: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"jr c,0x"+((binaryBytes[pc+1]<<24 >>24)+pc+2).toString(16));
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr c,"+asByteHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
 		//console.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
@@ -376,196 +487,195 @@ while(continueExecute) {
 	  }
 	  break;
 	case 0x39: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"add hl,sp");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"add hl,sp");
 		pc+=1;
 	  }
 	  break;
 	case 0x3E: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld a,0x"+binaryBytes[pc+1].toString(16));
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"ld a,"+asByteHex(binaryBytes[pc+1]));
 		a=binaryBytes[pc+1];
 		pc+=2;
 	  }
 	  break;
 	case 0x3f: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ccf");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ccf");
 		pc+=1;
 	  }
 	  break;
     case 0x49: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld c,c");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld c,c");
 		pc+=1;
 	  }
 	  break;
 	case 0x4a: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld c,d");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld c,d");
 		pc+=1;
 	  }
 	  break;
 	case 0x4c: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld c,h");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld c,h");
 		pc+=1;
 	  }
 	  break;
     case 0x4f: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld c,a");
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld c,a");
 		c=a;
 		pc+=1;
 	  }
 	  break;
     case 0x51: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld d,c");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld d,c");
 		pc+=1;
 	  }
 	  break;
 	case 0x54: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld d,h");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld d,h");
 		pc+=1;
 	  }
 	  break;
     case 0x58: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,b");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld e,b");
 		pc+=1;
 	  }
 	  break;
 	case 0x59: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,c");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld e,c");
 		pc+=1;
 	  }
 	  break;
 	case 0x5b: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,e");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld e,e");
 		pc+=1;
 	  }
 	  break;
 	case 0x5e: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld e,(hl)");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld e,(hl)");
 		pc+=1;
 	  }
 	  break;
 	case 0x60: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld h,b");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld h,b");
 		pc+=1;
 	  }
 	  break;
 	case 0x68: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld l,b");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld l,b");
 		pc+=1;
 	  }
 	  break;
 	case 0x6d: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld l,l");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld l,l");
 		pc+=1;
 	  }
 	  break;
 	case 0x6e: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld l,(hl)");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld l,(hl)");
 		pc+=1;
 	  }
 	  break;
     case 0x70: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),b");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld (hl),b");
 		pc+=1;
 	  }
 	  break;
 	case 0x71: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),c");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld (hl),c");
 		pc+=1;
 	  }
 	  break;
 	case 0x74: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),h");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld (hl),h");
 		pc+=1;
 	  }
 	  break;
 	case 0x76: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"halt");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"halt");
 		pc+=1;
 	  }
 	  break;
 	case 0x77: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld (hl),a");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld (hl),a");
 		pc+=1;
 	  }
 	  break;
 	case 0x78: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,b");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld a,b");
 		pc+=1;
 	  }
 	  break;
 	case 0x79: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld a,c");
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld a,c");
 		a=c;
 		pc+=1;
 	  }
 	  break;
 	case 0x7a: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,d");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld a,d");
 		pc+=1;
 	  }
 	  break;
 	case 0x7d: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,l");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld a,l");
 		pc+=1;
 	  }
 	  break;
     case 0x7e: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"ld a,(hl)");
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld a,(hl)");
 		a=binaryBytes[binaryBytes[h]*256+binaryBytes[l]];
 		if(a==undefined){a=0;}
 		pc+=1;
 	  }
 	  break;
     case 0x7f: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld a,a");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld a,a");
 		pc+=1;
 	  }
 	  break;
 	case 0x86: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"add a,(hl)");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"add a,(hl)");
 		pc+=1;
 	  }
 	  break;
     case 0x9a: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"sbc a,d");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"sbc a,d");
 		pc+=1;
 	  }
 	  break;
 	case 0xa3: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"and e");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"and e");
 		pc+=1;
 	  }
 	  break;
     case 0xad: {
-	    mnemonic=("m"+pc.toString(16)+"\t"+"xor l");
-		console.warn("accumulator not implemented");
+	    mnemonic=("m"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"xor l");
+		console.warn("not implemented");
 		pc+=1;
 	  }
 	  break;
     case 0xaf: {
-	    mnemonic=("m"+pc.toString(16)+"\t"+"xor a");
-		console.warn("accumulator not implemented");
+	    mnemonic=("m"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"xor a");
+		console.warn("not implemented");
 		pc+=1;
 	  }
 	  break;
 	case 0xba: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"cp d");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"cp d");
 		pc+=1;
 	  }
 	  break;
 	case 0xbb: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"cp e");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"cp e");
 		pc+=1;
 	  }
 	  break;
 	case 0xC1: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"pop bc");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"pop bc");
 		pc+=1;
 	  }
 	  break;
      case 0xD2: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"jp nc,0x"+(binaryBytes[pc+2]*256+binaryBytes[pc+1]).toString(16));
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+" "+asByteHex(binaryBytes[pc+2])+"\t"+"jp nc,"+asWordHex(binaryBytes[pc+2]*256+binaryBytes[pc+1]));
 		//console.log(".");
-		//TODO: JP jump number is wrong!
 		if(state=="DISASSEMBLE"){
 			pc+=3;
 	    }else{
@@ -574,33 +684,33 @@ while(continueExecute) {
 	  }
 	  break;
 	case 0xD3: {
-	    mnemonic=(" "+pc.toString(16)+"\t"+"out (0x"+binaryBytes[pc+1].toString(16)+"),a");
+	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"out ("+asByteHex(binaryBytes[pc+1])+"),a");
 		inOut[binaryBytes[pc+1]]=a;
 		pc+=2;
 	  }
 	  break;
 	case 0xDB: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"in a,(0x"+binaryBytes[pc+1].toString(16)+")");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"in a,("+asByteHex(binaryBytes[pc+1])+")");
 		pc+=2;
 	  }
 	  break
 	case 0xE6: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"and 0x"+binaryBytes[pc+1].toString(16)+"");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"and "+asByteHex(binaryBytes[pc+1])+"");
 		pc+=2;
 	  }
 	  break;
 	case 0xED: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"in a,c");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"in a,c");
 		pc+=2;
 	  }
 	  break;
 	case 0xF9: {
-	    mnemonic=("x"+pc.toString(16)+"\t"+"ld sp,hl");
+	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"ld sp,hl");
 		pc+=1;
 	  }
 	  break;
 	default:{
-		mnemonic=("x"+pc.toString(16)+"\t"+"undefined op code 0x"+binaryBytes[pc].toString(16));
+		mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"undefined op code "+asByteHex(binaryBytes[pc]));
 	    pc++;
 		}
 		break;
@@ -611,48 +721,43 @@ while(continueExecute) {
 		if(pc>=binaryBytes.length){
 			continueExecute=false;
 		}
-		
+		document.getElementById("disassembly").value=disassembly;
 	}else{
-	    mnemonic="step "+stepCounter+": "+mnemonic;
+	    mnemonic=pad(stepCounter,6)+": "+mnemonic;
 		document.getElementById("excection").value+=mnemonic+"\n";
 		excection+=mnemonic+"\n";
 		if(stepCounter>=maxSteps||currentOpcode==0x76){//0x76=halt
 			continueExecute=false;
 		}
+		document.getElementById("excection").value=excection;
+		document.getElementById("A").value=""+asByteHex(a);
+		document.getElementById("Adash").value=""+asByteHex(adash);
+		document.getElementById("F").value=""+asByteHex(f);
+		document.getElementById("Fdash").value=""+asByteHex(fdash);
+		document.getElementById("W").value=""+asByteHex(w);
+		document.getElementById("Wdash").value=""+asByteHex(wdash);
+		document.getElementById("Z").value=""+asByteHex(z);
+		document.getElementById("Zdash").value=""+asByteHex(zdash);
+		document.getElementById("B").value=""+asByteHex(b);
+		document.getElementById("Bdash").value=""+asByteHex(bdash);
+		document.getElementById("C").value=""+asByteHex(c);
+		document.getElementById("Cdash").value=""+asByteHex(cdash);
+		document.getElementById("D").value=""+asByteHex(d);
+		document.getElementById("Ddash").value=""+asByteHex(ddash);
+		document.getElementById("E").value=""+asByteHex(e);
+		document.getElementById("Edash").value=""+asByteHex(edash);
+		document.getElementById("H").value=""+asByteHex(h);
+		document.getElementById("Hdash").value=""+asByteHex(hdash);
+		document.getElementById("L").value=""+asByteHex(l);
+		document.getElementById("Ldash").value=""+asByteHex(ldash);
+		document.getElementById("IX").value=""+asWordHex(ix);
+		document.getElementById("IY").value=""+asWordHex(iy);
+		document.getElementById("SP").value=""+asWordHex(sp);
+		document.getElementById("PC").value=""+asWordHex(pc);
 	}
-	
-	document.getElementById("A").value="0x"+a.toString(16);
-	document.getElementById("Adash").value="0x"+adash.toString(16);
-	document.getElementById("F").value="0x"+f.toString(16);
-	document.getElementById("Fdash").value="0x"+fdash.toString(16);
-	document.getElementById("W").value="0x"+w.toString(16);
-	document.getElementById("Wdash").value="0x"+wdash.toString(16);
-	document.getElementById("Z").value="0x"+z.toString(16);
-	document.getElementById("Zdash").value="0x"+zdash.toString(16);
-	document.getElementById("B").value="0x"+b.toString(16);
-	document.getElementById("Bdash").value="0x"+bdash.toString(16);
-	document.getElementById("C").value="0x"+c.toString(16);
-	document.getElementById("Cdash").value="0x"+cdash.toString(16);
-	document.getElementById("D").value="0x"+d.toString(16);
-	document.getElementById("Ddash").value="0x"+ddash.toString(16);
-	document.getElementById("E").value="0x"+e.toString(16);
-	document.getElementById("Edash").value="0x"+edash.toString(16);
-	document.getElementById("H").value="0x"+h.toString(16);
-	document.getElementById("Hdash").value="0x"+hdash.toString(16);
-	document.getElementById("L").value="0x"+l.toString(16);
-	document.getElementById("Ldash").value="0x"+ldash.toString(16);
-	document.getElementById("IX").value="0x"+ix.toString(16);
-	document.getElementById("IY").value="0x"+iy.toString(16);
-	document.getElementById("SP").value="0x"+sp.toString(16);
-	document.getElementById("PC").value="0x"+pc.toString(16);
-    
-}
+	   
+	return continueExecute;
 
-//console.log(disassembly);
-document.getElementById("disassembly").value=disassembly;
-document.getElementById("excection").value=excection;
-
-//binaryBytes.push();
 }
 
 function drawCallGraph(){

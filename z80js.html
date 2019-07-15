@@ -17,13 +17,15 @@
 </head>
 <body>
 
-<div class="clearfix">
-<div class="box" style="background-color:#ddd">
-<p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (I08HEX or S-Record Format)</p>
-<textarea  name="iHex" id="iHex" rows="4" style="margin-left:5%;margin-right:5%;width:90%">
+<div style="background-color:#ddd">
+<p style="margin-left:2.5%;margin-right:2.5%;width:90%">Assembly Listing</p>
+<textarea  name="iHex" id="iHex" rows="4" style="margin-left:2.5%;margin-right:2.5%;width:95%">
 </textarea><br/>
-<button style="margin-left:5%;margin-right:5%;">Convert IHex to Binary</button><button style="margin-left:5%;margin-right:5%;">Convert S-Record to Binary</button>
+<button style="margin-left:2.5%;margin-right:0%;">Assemble to Binary</button>
 </div>
+
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
+<div class="">
 
 <div class="box" style="background-color:#eee">
 <p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (Hex-Binary)</p>
@@ -49,12 +51,23 @@ E2BA20DF110002189200000000000000
 7906CF5BE66D7D6D0000000000000000 
 393F5EF93F7F066D
 </textarea><br/>
-<button style="margin-left:5%;margin-right:5%;" onclick="javascript:disassemble()">Disassemble</button>
+<button style="margin-left:5%;margin-right:0%;" onclick="javascript:disassemble()">Disassemble</button>
+<button style="margin-left:0%;margin-right:0%;" onclick="">Convert to I08Hex</button>
+<button style="margin-left:0%;margin-right:0%;" onclick="">Convert to S-Record</button>
 </div>
+<div class="box" style="background-color:#ddd">
+<p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (I08HEX or S-Record Format)</p>
+<textarea  name="iHex" id="iHex" rows="4" style="margin-left:5%;margin-right:5%;width:90%">
+</textarea><br/>
+<button style="margin-left:5%;margin-right:0%;">Convert I08Hex to Binary</button>
+<button style="margin-left:0%;margin-right:0%;">Convert S-Record to Binary</button>
 </div>
 
-<div>
+</div>
+
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
+
+<div>
 <p>Z80 Archictecture and Register</p>
 <!--<div style="width:100%;height:*;position:relative;background-Image:url(Z80_arch.svg);background-size:100%;background-repeat:no-repeat;">-->
 <div style="width:100%;height:*;max-width:250mm;position:relative;background-color:#dbf1ff">

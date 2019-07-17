@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+<meta charset="utf-8"/>
 <title>A Javascript Based Z80 Disassembler and Simulator
 </title>
 <style>
@@ -72,6 +73,12 @@ E2BA20DF110002189200000000000000
 <!--<div style="width:100%;height:*;position:relative;background-Image:url(Z80_arch.svg);background-size:100%;background-repeat:no-repeat;">-->
 <div style="width:100%;height:*;max-width:250mm;position:relative;background-color:#dbf1ff">
 <img src="Z80_arch.svg" style="width:100%;opacity: 0.7;">
+
+<div style="position:absolute;left:14.5%;top:22%">
+<label for="I">I <input type=text name="I" id="I" value="0x00" style="width:2.5em;background-color:#ccc"/> </label></div>
+<div style="position:absolute;left:20.8%;top:22%">
+<label for="R">R <input type=text name="R" id="R" value="0x00" style="width:2.5em;background-color:#ccc"/> </label></div>
+
 <div style="position:absolute;left:35.6%;top:25%">
 <label for="Wdash"> W'<input type=text name="Wdash" id="Wdash" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label></div>
 <div style="position:absolute;left:43%;top:25%">
@@ -124,6 +131,14 @@ E2BA20DF110002189200000000000000
 <div style="position:absolute;left:86%;top:26%">
 <label for="F" >F <input type=text name="F" id="F" value="0x00" style="width:2.5em;background-color:#f4d7d7"/> </label> </div>
 
+<div style="position:absolute;left:92%;top:26%">
+<label for="Flong" ><input type=text name="Flong" id="Flong" value="SZ_H_PNC" style="width:5.3em;background-color:#dbf1ff"/> </label> </div>
+<div style="position:absolute;left:92%;top:32%">
+<label for="Flong" ><input type=text name="Fdashlong" id="Fdashlong" value="SZ_H_PNC" style="width:5.3em;background-color:#dbf1ff"/> </label> </div>
+
+<div style="position:absolute;left:92%;top:37%">
+<label for="F" >Out <br/> <textarea  name="Out" id="Out" rows="10" style="width:4em;background-color:#dbf1ff;overflow: hidden;"></textarea> </label> </div>
+
 </div>
 <p style="text-align:right;color:#aaa;font-size:small;margin-top:0px;margin-bottom:0px"> Image credit: Appaloosa, 17 October 2007, https://commons.wikimedia.org/wiki/File:Z80_arch.svg</p>
 </div>
@@ -141,9 +156,11 @@ E2BA20DF110002189200000000000000
 <label for="autoStep">Auto Step<input type="checkbox" name="autoStep" id="autoStep" onclick="javascript:autoStep()"/></label>
 <label for="Hz"><input type=text name="Hz" id="Hz" value="1" style="width:2em;background-color:#f4d7d7"/>Hz</label>
 <button onclick="javascript:runToAddr()">Run to addr</button>
-<label for="Bkpt1">Addr <input type=text name="Addr" id="Addr" value="0x03" style="width:4em;background-color:#f4d7d7"/>  </label>
-<label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x00" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt1Enabled" id="Bkpt1Enabled" disabled="disabled" />  </label>
-<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x00" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt2Enabled" id="Bkpt2Enabled" disabled="disabled" />  </label>
+<label for="Bkpt1">Addr <input type=text name="Addr" id="Addr" value="0x0030" style="width:4em;background-color:#f4d7d7"/>  </label>
+<label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt1Enabled" id="Bkpt1Enabled" disabled="disabled" />  </label>
+<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt2Enabled" id="Bkpt2Enabled" disabled="disabled" />  </label>
+<button onclick="javascript:interrupt()">Interrupt</button>
+<label for="IntMode">Mode <select name="IntMode" id="IntMode"><option>1</option><option selected>2</option><option>3</option></select></label>
 </div>
 
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
@@ -183,20 +200,26 @@ E2BA20DF110002189200000000000000
 <canvas id="FlowGraph" width="200" height="100"></canvas>
 </div>
 
+<hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
+
+<p>Further reading</p>
+Zilog Z80 CPU User Manual <a href="http://z80.info/zip/z80cpu_um.pdf">http://z80.info/zip/z80cpu_um.pdf</a><br/>
+Z80 Family Interrupt Structure by Michael Moor <a href="http://z80.info/1653.htm">http://z80.info/1653.htm</a><br/>
+Kurze Übersicht über die Befehle des Z80 by Matthias Buchhorn <a href="https://www.mikrocontroller.net/attachment/235150/Instruction_Card_Z80.pdf">https://www.mikrocontroller.net/attachment/235150/Instruction_Card_Z80.pdf</a><br/>
 
 <script language="javascript">
 console.log("Z80 Disassembler and Simulator started");
 
 var binaryBytes;
-var inOut = new Array(256); //registers reachable by the in and out instructions
 var disassembly=""; //holds the output of the disassembly
 var excection=""; //holds the ouput of the excection
 var stepCounter = 0;
 var maxSteps=100;
 var autoStepTimer;
 
-
 //registers
+var r=0;
+var i=0;
 var a=0;
 var adash=0;
 var f=0;
@@ -221,12 +244,12 @@ var ix=0
 var iy=0;
 var sp=0;
 var pc=0;
+var inOut = new Array(256); //registers reachable by the in and out instructions
 
 function pad(value, width) {
   value = value + "";
   return value.length >= width ? value : new Array(width - value.length + 1).join('0') + value;
 }
-
 
 function asQwordHex(value){
 return "0x"+pad(value.toString(16),16);
@@ -290,18 +313,103 @@ function runToAddr(){
 	}
 }
 
+function interrupt(){
+	console.log("Interrupt caught");
+	interruptmode=1;
+	//the z80 knows three different modes of interrupt handling. None is implemented yet.
+	//mode 0: z80 (multi-byte) instruction is read from databus and excecuted.
+	//mode 1: call to subroutine at address 0x38.
+	//mode 2:
+    switch(interruptmode){
+		case 0:
+			//opcode(s) = ???
+		break;
+		case 1:
+			pc=0x38;
+		break;
+		case 2:
+			//pc=(l*256+???)
+		break;
+		default:
+	}
+	updateGUI();
+}
+
+function flagBit(flag){
+	//F register holds flags
+	//bit 7 S - sign flag
+	//bit 6 Z - zero flag
+	//bit 5 F5 - undocumented flag
+	//bit 4 H - half carry flag (carry from bit 3 to bit 3. used for BCD arithmetic)
+    //bit 3 F3 - undocumented flag
+	//bit 2 P/V - parity or overflow
+	//bit 1 N - last operation was subtract
+	//bit 0 C - carry
+	switch(flag){
+	case "S":
+		return 7;
+	break;
+	case "Z":
+		return 6;
+	break;
+	case "H":
+		return 4;
+	break;
+	case "P":
+	case "V":
+		return 2;
+	break;
+	case "N":
+		return 1;
+	break;
+	case "C":
+		return 0;
+	break;
+	default:
+		return -1;
+	}
+}
+
+function setFlag(flag, value){
+	f|=(1<<flagBit(flag));
+}
+function getFlag(flag){
+	return (f&(1<<flagBit(flag)));
+}
+function clearFlag(flag, value){
+	f&=~(1<<flagBit(flag));
+}
+function clearFlags(){
+	f=0;
+}
+
+function flagsToString(f){
+	var flagArray=[..."SZ_H_PNC"];
+	for(var i=0;i<flagArray.length;i++){
+		if(!getFlag(flagArray[i])){
+			flagArray[i]="_";
+			//console.log("flag "+flagArray[i]+" is not set");
+		}else{
+			//console.log("flag "+flagArray[i]+" is set");
+		}
+	}
+	return flagArray.join('');
+}
+
 function reset(){
 	document.getElementById("excection").value="";
 	binaryBytes=undefined;
-	inOut = new Array(256);
 	disassembly="";
 	excection="";
 	disassemble();
 	stepCounter = 0;
 	//reset registers
+	r=0;
+	i=0;
 	a=0;
 	adash=0;
-	f=0;	
+	//f=0;
+	clearFlags()	
 	fdash=0;
 	w=0;
 	wdash=0;
@@ -323,6 +431,8 @@ function reset(){
 	iy=0;
 	sp=0;
 	pc=0;
+	inOut = new Array(256);
+	updateGUI();
 }
 
 function disassemble(){
@@ -742,35 +852,55 @@ function excecute(excectionType){
 		if(stepCounter>=maxSteps||currentOpcode==0x76){//0x76=halt
 			continueExecute=false;
 		}
-		document.getElementById("excection").value=excection;
-		document.getElementById("A").value=""+asByteHex(a);
-		document.getElementById("Adash").value=""+asByteHex(adash);
-		document.getElementById("F").value=""+asByteHex(f);
-		document.getElementById("Fdash").value=""+asByteHex(fdash);
-		document.getElementById("W").value=""+asByteHex(w);
-		document.getElementById("Wdash").value=""+asByteHex(wdash);
-		document.getElementById("Z").value=""+asByteHex(z);
-		document.getElementById("Zdash").value=""+asByteHex(zdash);
-		document.getElementById("B").value=""+asByteHex(b);
-		document.getElementById("Bdash").value=""+asByteHex(bdash);
-		document.getElementById("C").value=""+asByteHex(c);
-		document.getElementById("Cdash").value=""+asByteHex(cdash);
-		document.getElementById("D").value=""+asByteHex(d);
-		document.getElementById("Ddash").value=""+asByteHex(ddash);
-		document.getElementById("E").value=""+asByteHex(e);
-		document.getElementById("Edash").value=""+asByteHex(edash);
-		document.getElementById("H").value=""+asByteHex(h);
-		document.getElementById("Hdash").value=""+asByteHex(hdash);
-		document.getElementById("L").value=""+asByteHex(l);
-		document.getElementById("Ldash").value=""+asByteHex(ldash);
-		document.getElementById("IX").value=""+asWordHex(ix);
-		document.getElementById("IY").value=""+asWordHex(iy);
-		document.getElementById("SP").value=""+asWordHex(sp);
-		document.getElementById("PC").value=""+asWordHex(pc);
+		updateGUI();
 	}
 	   
 	return continueExecute;
 
+}
+
+function updateGUI(){
+		document.getElementById("excection").value=excection;
+		highlightUpdateValue(document.getElementById("I"),""+asByteHex(i));
+		highlightUpdateValue(document.getElementById("R"),""+asByteHex(r));
+		highlightUpdateValue(document.getElementById("A"),""+asByteHex(a));
+		highlightUpdateValue(document.getElementById("Adash"),""+asByteHex(adash));
+		highlightUpdateValue(document.getElementById("F"),""+asByteHex(f));
+		highlightUpdateValue(document.getElementById("Fdash"),""+asByteHex(fdash));
+		highlightUpdateValue(document.getElementById("W"),""+asByteHex(w));
+		highlightUpdateValue(document.getElementById("Wdash"),""+asByteHex(wdash));
+		highlightUpdateValue(document.getElementById("Z"),""+asByteHex(z));
+		highlightUpdateValue(document.getElementById("Zdash"),""+asByteHex(zdash));
+		highlightUpdateValue(document.getElementById("B"),""+asByteHex(b));
+		highlightUpdateValue(document.getElementById("Bdash"),""+asByteHex(bdash));
+		highlightUpdateValue(document.getElementById("C"),""+asByteHex(c));
+		highlightUpdateValue(document.getElementById("Cdash"),""+asByteHex(cdash));
+		highlightUpdateValue(document.getElementById("D"),""+asByteHex(d));
+		highlightUpdateValue(document.getElementById("Ddash"),""+asByteHex(ddash));
+		highlightUpdateValue(document.getElementById("E"),""+asByteHex(e));
+		highlightUpdateValue(document.getElementById("Edash"),""+asByteHex(edash));
+		highlightUpdateValue(document.getElementById("H"),""+asByteHex(h));
+		highlightUpdateValue(document.getElementById("Hdash"),""+asByteHex(hdash));
+		highlightUpdateValue(document.getElementById("L"),""+asByteHex(l));
+		highlightUpdateValue(document.getElementById("Ldash"),""+asByteHex(ldash));
+		highlightUpdateValue(document.getElementById("IX"),""+asWordHex(ix));
+		highlightUpdateValue(document.getElementById("IY"),""+asWordHex(iy));
+		highlightUpdateValue(document.getElementById("SP"),""+asWordHex(sp));
+		highlightUpdateValue(document.getElementById("PC"),""+asWordHex(pc));
+		document.getElementById("Out").value=""+(inOut[0]==undefined?"--":asByteHex(inOut[0]))+"\n"+(inOut[1]==undefined?"--":asByteHex(inOut[1]))+"\n"+(inOut[2]==undefined?"--":asByteHex(inOut[2]))+"\n"+(inOut[3]==undefined?"--":asByteHex(inOut[3]))+"\n";
+		document.getElementById("Out").scrollTop=0;
+		highlightUpdateValue(document.getElementById("Flong"),flagsToString(f));
+		highlightUpdateValue(document.getElementById("Fdashlong"),flagsToString(fdash));
+		
+}
+
+function highlightUpdateValue(field, value){
+	if(field.value==value){
+		field.style.backgroundColor = "white";
+	}else{
+		field.style.backgroundColor = "red";
+		field.value=value;
+	}
 }
 
 function drawCallGraph(){

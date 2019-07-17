@@ -150,17 +150,22 @@ E2BA20DF110002189200000000000000
 <div class="clearfix">
 <button onclick="javascript:reset()">Reset</button>
 <button onclick="javascript:run()">Run</button>
+<button onclick="javascript:halt()">Halt</button><br/>
+<button onclick="javascript:halt()">Step into</button>
+<button onclick="javascript:halt()">Step over</button>
+<button onclick="javascript:halt()">Step out</button>
 <button onclick="javascript:step()">Step 1</button>
 <button onclick="javascript:stepN()">Step N</button>
 <label for="N">N <input type=text name="N" id="N" value="2" style="width:4em;background-color:#f4d7d7"/> </label>
 <label for="autoStep">Auto Step<input type="checkbox" name="autoStep" id="autoStep" onclick="javascript:autoStep()"/></label>
-<label for="Hz"><input type=text name="Hz" id="Hz" value="1" style="width:2em;background-color:#f4d7d7"/>Hz</label>
+<label for="Hz"><input type=text name="Hz" id="Hz" value="1" style="width:2em;background-color:#f4d7d7"/>Hz</label><br/>
 <button onclick="javascript:runToAddr()">Run to addr</button>
 <label for="Bkpt1">Addr <input type=text name="Addr" id="Addr" value="0x0030" style="width:4em;background-color:#f4d7d7"/>  </label>
 <label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt1Enabled" id="Bkpt1Enabled" disabled="disabled" />  </label>
-<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt2Enabled" id="Bkpt2Enabled" disabled="disabled" />  </label>
-<button onclick="javascript:interrupt()">Interrupt</button>
+<label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt2Enabled" id="Bkpt2Enabled" disabled="disabled" />  </label><br/>
+<button onclick="javascript:interrupt()">INT</button>
 <label for="IntMode">Mode <select name="IntMode" id="IntMode"><option>1</option><option selected>2</option><option>3</option></select></label>
+<button onclick="javascript:interrupt()">NMI</button>
 </div>
 
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
@@ -208,7 +213,14 @@ Z80 Family Interrupt Structure by Michael Moor <a href="http://z80.info/1653.htm
 Kurze Übersicht über die Befehle des Z80 by Matthias Buchhorn <a href="https://www.mikrocontroller.net/attachment/235150/Instruction_Card_Z80.pdf">https://www.mikrocontroller.net/attachment/235150/Instruction_Card_Z80.pdf</a><br/>
 
 <script language="javascript">
-console.log("Z80 Disassembler and Simulator started");
+
+var logger={
+	log:function(text){console.log(text);},
+	warn:function(text){logger.warn(text);},
+	error:function(text){console.error(text);},
+};
+
+logger.log("z80js - Z80 Disassembler and Simulator starting");
 
 var binaryBytes;
 var disassembly=""; //holds the output of the disassembly
@@ -246,6 +258,8 @@ var sp=0;
 var pc=0;
 var inOut = new Array(256); //registers reachable by the in and out instructions
 
+logger.log("z80js - Z80 Disassembler and Simulator ready");
+
 function pad(value, width) {
   value = value + "";
   return value.length >= width ? value : new Array(width - value.length + 1).join('0') + value;
@@ -269,8 +283,15 @@ return "0x"+pad(value.toString(16),2);
 
 function run(){
 	if(binaryBytes!=undefined){
-		while(excecute('RUN'));
+		document.getElementById("autoStep").checked=false;
+		autoStepTimer=setInterval(step, 1);
+		//while(excecute('RUN'));
 	}
+}
+
+function halt(){
+	document.getElementById("autoStep").checked=false;
+	clearTimeout(autoStepTimer);
 }
 
 function step(){
@@ -295,11 +316,11 @@ function autoStep(){
 		return;
 	}
 	if(document.getElementById("autoStep").checked==true){
-		console.log("auto step on");
+		logger.log("auto step on");
 		var hz=document.getElementById("Hz").value;
 		autoStepTimer=setInterval(step, 1000/hz);
 	}else{
-		console.log("auto step off");
+		logger.log("auto step off");
 		clearTimeout(autoStepTimer);
 	}
 }
@@ -308,13 +329,13 @@ function runToAddr(){
 	if(binaryBytes!=undefined){
 		var addr = parseInt(document.getElementById("Addr").value, 16);
 		while(pc!=addr&&excecute('RUN')){
-			//console.log("addr: "+addr+" pc "+pc);			
+			//logger.log("addr: "+addr+" pc "+pc);			
 		}
 	}
 }
 
 function interrupt(){
-	console.log("Interrupt caught");
+	logger.log("Interrupt caught");
 	interruptmode=1;
 	//the z80 knows three different modes of interrupt handling. None is implemented yet.
 	//mode 0: z80 (multi-byte) instruction is read from databus and excecuted.
@@ -339,9 +360,9 @@ function flagBit(flag){
 	//F register holds flags
 	//bit 7 S - sign flag
 	//bit 6 Z - zero flag
-	//bit 5 F5 - undocumented flag
+	//bit 5 X - not used / undocumented flag
 	//bit 4 H - half carry flag (carry from bit 3 to bit 3. used for BCD arithmetic)
-    //bit 3 F3 - undocumented flag
+    //bit 3 X - not used / undocumented flag
 	//bit 2 P/V - parity or overflow
 	//bit 1 N - last operation was subtract
 	//bit 0 C - carry
@@ -388,15 +409,16 @@ function flagsToString(f){
 	for(var i=0;i<flagArray.length;i++){
 		if(!getFlag(flagArray[i])){
 			flagArray[i]="_";
-			//console.log("flag "+flagArray[i]+" is not set");
+			//logger.log("flag "+flagArray[i]+" is not set");
 		}else{
-			//console.log("flag "+flagArray[i]+" is set");
+			//logger.log("flag "+flagArray[i]+" is set");
 		}
 	}
 	return flagArray.join('');
 }
 
 function reset(){
+	halt();
 	document.getElementById("excection").value="";
 	binaryBytes=undefined;
 	disassembly="";
@@ -439,14 +461,14 @@ function disassemble(){
 	var binary=document.getElementById("binary").value;
 	binary = binary.toUpperCase();
 	binary = binary.replace(/[^A-Z0-9]/gi,"");
-	console.log("Ascii Encoded length: "+binary.length);
+	logger.log("Ascii Encoded length: "+binary.length);
 	binaryBytes = new Uint8Array(binary.length/2);
-	console.log("Binary length: "+binaryBytes.length);
+	logger.log("Binary length: "+binaryBytes.length);
 	
 	for(var i=0;i<binary.length/2;i++){
 		//disassembly+=binary[2*i]+""+binary[2*i+1]+"\n";
 		binaryBytes[i]=parseInt("0x"+binary[2*i]+""+binary[2*i+1]);
-		//console.log(binaryBytes[i]);
+		//logger.log(binaryBytes[i]);
 	}
 	disassembly="";
 	stepCounter = 0;
@@ -467,7 +489,7 @@ function excecute(excectionType){
   if(currentOpcode==undefined){
   currentOpcode=0x00;
   }
-  //console.log(pc.toString(16)+" "+currentOpcode.toString(16));
+  //logger.log(pc.toString(16)+" "+currentOpcode.toString(16));
   
   switch(currentOpcode){
     case 0x00: {
@@ -494,7 +516,7 @@ function excecute(excectionType){
 	  break;
     case 0x10: {
 	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"djnz "+asWordHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
-		//console.log(".");
+		//logger.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
 	    }else{
@@ -517,13 +539,13 @@ function excecute(excectionType){
 	  break;
     case 0x17: {
 	    mnemonic=("m"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"rla");
-		console.warn("not implemented");
+		logger.warn("not implemented");
 		pc+=1;
 	  }
 	  break;
     case 0x18: {
 	    mnemonic=(" "+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr "+asWordHex((binaryBytes[pc+1]<<24 >>24)+pc+2))
-		//console.log(".");
+		//logger.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
 	    }else{
@@ -543,7 +565,7 @@ function excecute(excectionType){
 	  break;
 	case 0x20: {
 	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr nz,"+asByteHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
-		//console.log(".");
+		//logger.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
 	    }else{
@@ -586,7 +608,7 @@ function excecute(excectionType){
 	  break;
     case 0x30: {
 	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr nc,"+asByteHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
-		//console.log(".");
+		//logger.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
 	    }else{
@@ -601,7 +623,7 @@ function excecute(excectionType){
 	  break;
 	case 0x38: {
 	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+"\t"+"jr c,"+asByteHex((binaryBytes[pc+1]<<24 >>24)+pc+2));
-		//console.log(".");
+		//logger.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=2;
 	    }else{
@@ -771,13 +793,13 @@ function excecute(excectionType){
 	  break;
     case 0xad: {
 	    mnemonic=("m"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"xor l");
-		console.warn("not implemented");
+		logger.warn("not implemented");
 		pc+=1;
 	  }
 	  break;
     case 0xaf: {
 	    mnemonic=("m"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+"    \t"+"xor a");
-		console.warn("not implemented");
+		logger.warn("not implemented");
 		pc+=1;
 	  }
 	  break;
@@ -798,7 +820,7 @@ function excecute(excectionType){
 	  break;
      case 0xD2: {
 	    mnemonic=("x"+asWordHex(pc)+":\t"+asByteHex(binaryBytes[pc])+" "+asByteHex(binaryBytes[pc+1])+" "+asByteHex(binaryBytes[pc+2])+"\t"+"jp nc,"+asWordHex(binaryBytes[pc+2]*256+binaryBytes[pc+1]));
-		//console.log(".");
+		//logger.log(".");
 		if(state=="DISASSEMBLE"){
 			pc+=3;
 	    }else{
@@ -838,7 +860,7 @@ function excecute(excectionType){
 		}
 		break;
  }
-  //console.log(mnemonic);
+  //logger.log(mnemonic);
     if(state=="DISASSEMBLE"){
 		disassembly+=mnemonic+"\n";
 		if(pc>=binaryBytes.length){
@@ -919,6 +941,269 @@ canvasContext.lineTo(200, 0);
 canvasContext.stroke(); 
 }
 
+//instructions
+var instructions=[
+{opcode:0x00,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x01,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x02,length:1,mnemonic:"ld (bc),a",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x03,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x04,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x05,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x06,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x07,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x08,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x09,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x0a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x0b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x0c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x0d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x0e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x0f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x10,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x11,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x12,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x13,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x14,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x15,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x16,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x17,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x18,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x19,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x1a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x1b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x1c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x1d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x1e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x1f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x20,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x21,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x22,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x23,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x24,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x25,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x26,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x27,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x28,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x29,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x2a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x2b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x2c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x2d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x2e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x2f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x30,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x31,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x32,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x33,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x34,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x35,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x36,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x37,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x38,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x39,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x3a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x3b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x3c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x3d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x3e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x3f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x40,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x41,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x42,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x43,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x44,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x45,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x46,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x47,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x48,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x49,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x4a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x4b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x4c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x4d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x4e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x4f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x50,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x51,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x52,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x53,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x54,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x55,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x56,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x57,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x58,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x59,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x5a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x5b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x5c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x5d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x5e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x5f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x60,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x61,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x62,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x63,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x64,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x65,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x66,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x67,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x68,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x69,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x6a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x6b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x6c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x6d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x6e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x6f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x70,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x71,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x72,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x73,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x74,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x75,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x76,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x77,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x78,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x79,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x7a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x7b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x7c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x7d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x7e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x7f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x80,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x81,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x82,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x83,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x84,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x85,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x86,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x87,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x88,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x89,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x8a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x8b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x8c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x8d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x8e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x8f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x90,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x91,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x92,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x93,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x94,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x95,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x96,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x97,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x98,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x99,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x9a,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x9b,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x9c,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x9d,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x9e,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0x9f,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa0,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa1,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa2,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa3,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa4,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa5,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa6,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa7,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa8,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xa9,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xaa,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xab,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xac,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xad,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xae,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xaf,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb0,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb1,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb2,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb3,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb4,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb5,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb6,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb7,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb8,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xb9,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xba,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xbb,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xbc,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xbd,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xbe,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xbf,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc0,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc1,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc2,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc3,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc4,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc5,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc6,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc7,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc8,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xc9,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xca,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xcb,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xcc,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xcd,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xce,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xcf,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd0,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd1,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd2,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd3,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd4,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd5,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd6,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd7,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd8,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xd9,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xda,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xdb,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xdc,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xdd,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xde,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xdf,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe0,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe1,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe2,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe3,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe4,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe5,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe6,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe7,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe8,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xe9,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xea,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xeb,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xec,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xed,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xee,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xef,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf0,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf1,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf2,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf3,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf4,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf5,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf6,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf7,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf8,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xf9,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xfa,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xfb,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xfc,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xfd,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xfe,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}},
+{opcode:0xff,length:1,mnemonic:"",operands:"",mcycles:[4],conditions:"",execute:function(){logger.log("not implemented");}}
+];
+/*
+for(var i=0;i<256;i++){
+    document.getElementById("excection").value+="{opcode:"+asByteHex(i)+",length:1,mnemonic:\"\",operands:\"\",mcycles:[4],conditions:\"\",execute:function(){logger.log(\"not implemented\");}},\n";
+}*/
 </script>
 
 </body>

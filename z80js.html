@@ -19,7 +19,7 @@
 </head>
 <body>
 
-<div style="background-color:#ddd">
+<!--<div style="background-color:#ddd">
 <p style="margin-left:2.5%;margin-right:2.5%;width:90%">Assembly Listing</p>
 <textarea  name="iHex" id="iHex" rows="4" style="margin-left:2.5%;margin-right:2.5%;width:95%">
 </textarea><br/>
@@ -27,8 +27,9 @@
 </div>
 
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
-<div class="">
+-->
 
+<div class="">
 <div class="box" style="background-color:#eee">
 <p style="margin-left:5%;margin-right:5%;width:90%">Binary Code (Hex-Binary)</p>
 <textarea  name="binary" id="binary" rows="4" style="margin-left:5%;margin-right:5%;width:90%">
@@ -165,8 +166,7 @@ E2BA20DF110002189200000000000000
 <label for="Bkpt1">Bkpt1 <input type=text name="Bkpt1" id="Bkpt1" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt1Enabled" id="Bkpt1Enabled" disabled="disabled" />  </label>
 <label for="Bkpt2">Bkpt2 <input type=text name="Bkpt2" id="Bkpt2" value="0x0000" style="width:4em;background-color:#f4d7d7"/><input type="checkbox" name="Bkpt2Enabled" id="Bkpt2Enabled" disabled="disabled" />  </label><br/>
 <button onclick="javascript:interrupt()">INT</button>
-<label for="IntMode">Mode <select name="IntMode" id="IntMode"><option>1</option><option selected>2</option><option>3</option></select></label>
-<button onclick="javascript:interrupt()">NMI</button>
+<button onclick="javascript:nminterrupt()">NMI</button>
 </div>
 
 <hr style="border:solid #aaaaff 1px;height:1px;margin-top"/>
@@ -176,14 +176,14 @@ E2BA20DF110002189200000000000000
 <div class="clearfix">
 <div class="box" style="background-color:#ddd">
 <p style="margin-left:5%;margin-right:5%;width:90%">Disassembly</p>
-<p style="margin-left:5%;margin-right:5%;width:90%;margin-bottom:0px;">address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd+data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mnemonic</p>
-<textarea  name="disassembly" id="disassembly" rows="50" style="margin-left:5%;margin-right:5%;width:90%">
+<p style="margin-left:5%;margin-right:5%;width:90%;margin-bottom:0px;">address&nbsp;&nbsp;&nbsp;&nbsp;cmd+data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mnemonic</p>
+<textarea  name="disassembly" id="disassembly" rows="20" style="margin-left:5%;margin-right:5%;width:90%">
 </textarea><br/>
 </div>
 <div class="box" style="background-color:#eee">
 <p style="margin-left:5%;margin-right:5%;width:90%">Exceution Log</p>
 <p style="margin-left:5%;margin-right:5%;width:90%;margin-bottom:0px;">step&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;cmd+data&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mnemonic</p>
-<textarea  name="disassembly" id="excection" rows="50" style="margin-left:5%;margin-right:5%;width:90%">
+<textarea  name="disassembly" id="excection" rows="20" style="margin-left:5%;margin-right:5%;width:90%">
 </textarea><br/>
 </div>
 </div>
@@ -212,6 +212,7 @@ E2BA20DF110002189200000000000000
 Zilog Z80 CPU User Manual <a href="http://z80.info/zip/z80cpu_um.pdf">http://z80.info/zip/z80cpu_um.pdf</a><br/>
 Z80 Family Interrupt Structure by Michael Moor <a href="http://z80.info/1653.htm">http://z80.info/1653.htm</a><br/>
 Kurze Übersicht über die Befehle des Z80 by Matthias Buchhorn <a href="https://www.mikrocontroller.net/attachment/235150/Instruction_Card_Z80.pdf">https://www.mikrocontroller.net/attachment/235150/Instruction_Card_Z80.pdf</a><br/>
+Z80 Instruction Set <a href="http://wikiti.brandonw.net/index.php?title=Z80_Instruction_Set">http://wikiti.brandonw.net/index.php?title=Z80_Instruction_Set</a>
 
 <script language="javascript">
 
@@ -316,23 +317,12 @@ function runToAddr(){
 
 function interrupt(){
 	logger.log("Interrupt caught");
-	interruptmode=1;
-	//the z80 knows three different modes of interrupt handling. None is implemented yet.
-	//mode 0: z80 (multi-byte) instruction is read from databus and excecuted.
-	//mode 1: call to subroutine at address 0x38.
-	//mode 2:
-    switch(interruptmode){
-		case 0:
-			//opcode(s) = ???
-		break;
-		case 1:
-			pc=0x38;
-		break;
-		case 2:
-			//pc=(l*256+???)
-		break;
-		default:
-	}
+	cpu.interrupt();
+	updateGUI();
+}
+function nminterrupt(){
+	logger.log("Non maskable interrupt caught");
+	cpu.nonmaskableinterrupt();
 	updateGUI();
 }
 
@@ -374,8 +364,8 @@ function flagBit(flag){
 function setFlag(flag, value){
 	cpu.flags.F|=(1<<flagBit(flag));
 }
-function getFlag(flag){
-	return (cpu.flags.F&(1<<flagBit(flag)));
+function getFlag(F,flag){
+	return (F&(1<<flagBit(flag)));
 }
 function clearFlag(flag, value){
 	cpu.flags.F&=~(1<<flagBit(flag));
@@ -387,7 +377,7 @@ function clearFlags(){
 function flagsToString(f){
 	var flagArray=[..."SZ_H_PNC"];
 	for(var i=0;i<flagArray.length;i++){
-		if(!getFlag(flagArray[i])){
+		if(!getFlag(f,flagArray[i])){
 			flagArray[i]="_";
 			//logger.log("flag "+flagArray[i]+" is not set");
 		}else{
